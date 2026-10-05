@@ -16,18 +16,8 @@ jobs:
         run: |
           mkdir -p app/src/main/assets
           cp "$ANDROID_HOME/platforms/android-34/android.jar" app/src/main/assets/android.jar
-      - name: Download aapt2 for Android
-        run: |
-          BASE="https://github.com/revanced/revanced-manager/raw/main/android/app/src/main/jniLibs"
-          for abi in arm64-v8a armeabi-v7a; do
-            mkdir -p app/src/main/jniLibs/$abi
-            if curl -fL "$BASE/$abi/libaapt2.so" -o /tmp/aapt2-$abi.so; then
-              mv /tmp/aapt2-$abi.so app/src/main/jniLibs/$abi/libaapt2.so
-            else
-              echo "WARN: aapt2 download failed for $abi"
-            fi
-          done
-          ls -lR app/src/main/jniLibs
+      - name: Check native libs
+        run: ls -l app/src/main/jniLibs/arm64-v8a | head -n 70
       - run: gradle assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
