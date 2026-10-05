@@ -29,6 +29,7 @@ public class EcjRunner {
 
             List<String> javaFiles = new ArrayList<>();
             collect(src, javaFiles);
+            collect(new File(projectDir, "build/gen"), javaFiles);
             if (javaFiles.isEmpty()) return "ERROR: no .java files in src/";
 
             List<String> args = new ArrayList<>();
