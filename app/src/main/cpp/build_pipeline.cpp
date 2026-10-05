@@ -33,9 +33,9 @@ std::string jsonString(const std::string& json, const std::string& key) {
 
 }  // namespace
 
-BuildPipeline::BuildPipeline(const std::string& projectDir,
-                             aalam_log_fn log, void* user)
-    : dir_(projectDir), log_(log), user_(user) {}
+BuildPipeline::BuildPipeline(const std::string& projectDir, aalam_log_fn log,
+                             aalam_step_fn step, void* user)
+    : dir_(projectDir), log_(log), step_(step), user_(user) {}
 
 void BuildPipeline::say(const std::string& msg) {
     if (log_) log_(msg.c_str(), user_);
@@ -44,8 +44,8 @@ void BuildPipeline::say(const std::string& msg) {
 int BuildPipeline::run(const std::string& target) {
     if (!prepare(target)) return 1;
     if (!compileJava()) return 2;
-    say("Build finished.");
-    return 0;
+    say("Steps 3-7 not implemented yet - next.");
+    return 3;
 }
 
 bool BuildPipeline::prepare(const std::string& target) {
@@ -80,6 +80,15 @@ bool BuildPipeline::prepare(const std::string& target) {
 
 bool BuildPipeline::compileJava() {
     say("[2/7] Compiling Java (ECJ)...");
-    say("Not implemented yet - next step.");
-    return false;
+    if (!step_) {
+        say("ERROR: no Java step runner available");
+        return false;
+    }
+    int rc = step_("ecj", dir_.c_str(), user_);
+    if (rc != 0) {
+        say("[2/7] Compiling Java... FAILED");
+        return false;
+    }
+    say("[2/7] Compiling Java... OK");
+    return true;
 }
