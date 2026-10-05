@@ -13,6 +13,7 @@ public:
 private:
     void say(const std::string& msg);
     bool prepare(const std::string& target);
+    bool compileResources();
     bool compileJava();
 
     std::string dir_;
