@@ -17,6 +17,7 @@ public class NativeBridge {
 
     /** Called from C++ for steps that run in Java. */
     public static String runJavaStep(String step, String dir) {
+        if ("aapt2".equals(step)) return AaptRunner.run(appContext, dir);
         if ("ecj".equals(step)) return EcjRunner.compile(appContext, dir);
         return "ERROR: unknown step " + step;
     }
