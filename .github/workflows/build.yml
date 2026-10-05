@@ -12,6 +12,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
+      - name: Add android.jar to assets
+        run: |
+          ls "$ANDROID_HOME/platforms"
+          mkdir -p app/src/main/assets
+          cp "$ANDROID_HOME/platforms/android-34/android.jar" app/src/main/assets/android.jar
       - run: gradle assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
