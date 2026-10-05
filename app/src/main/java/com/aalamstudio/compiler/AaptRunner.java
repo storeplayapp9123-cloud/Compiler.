@@ -18,7 +18,8 @@ public class AaptRunner {
     /** Returns a string starting with "OK" on success, "ERROR" on failure. */
     public static String run(Context ctx, String projectDir) {
         try {
-            File aapt2 = new File(ctx.getApplicationInfo().nativeLibraryDir, "libaapt2.so");
+            String libDir = ctx.getApplicationInfo().nativeLibraryDir;
+            File aapt2 = new File(libDir, "libaapt2.so");
             if (!aapt2.exists()) {
                 return "ERROR: libaapt2.so not found for this phone "
                         + Arrays.toString(Build.SUPPORTED_ABIS);
@@ -45,7 +46,7 @@ public class AaptRunner {
             if (hasRes) {
                 String err = exec(Arrays.asList(aapt2.getAbsolutePath(), "compile",
                         "--dir", res.getAbsolutePath(),
-                        "-o", resZip.getAbsolutePath()), build);
+                        "-o", resZip.getAbsolutePath()), build, libDir);
                 if (err != null) return "ERROR: aapt2 compile failed\n" + err;
             }
 
@@ -64,7 +65,7 @@ public class AaptRunner {
             }
             if (hasRes) link.add(resZip.getAbsolutePath());
 
-            String err = exec(link, build);
+            String err = exec(link, build, libDir);
             if (err != null) return "ERROR: aapt2 link failed\n" + err;
 
             return "OK: base.apk created (" + baseApk.length() + " bytes)";
@@ -81,10 +82,11 @@ public class AaptRunner {
     }
 
     /** Runs a command. Returns null on success, or its output on failure. */
-    private static String exec(List<String> cmd, File workDir) throws Exception {
+    private static String exec(List<String> cmd, File workDir, String libDir) throws Exception {
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(workDir);
         pb.redirectErrorStream(true);
+        pb.environment().put("LD_LIBRARY_PATH", libDir);
         Process p = pb.start();
         StringBuilder out = new StringBuilder();
         try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
