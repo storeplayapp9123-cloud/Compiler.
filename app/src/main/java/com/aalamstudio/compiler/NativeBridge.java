@@ -19,6 +19,7 @@ public class NativeBridge {
     public static String runJavaStep(String step, String dir) {
         if ("aapt2".equals(step)) return AaptRunner.run(appContext, dir);
         if ("ecj".equals(step)) return EcjRunner.compile(appContext, dir);
+        if ("d8".equals(step)) return DexRunner.run(appContext, dir);
         return "ERROR: unknown step " + step;
     }
 }
