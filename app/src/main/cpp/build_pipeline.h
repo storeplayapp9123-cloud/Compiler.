@@ -13,8 +13,7 @@ public:
 private:
     void say(const std::string& msg);
     bool prepare(const std::string& target);
-    bool compileResources();
-    bool compileJava();
+    bool runStep(const std::string& label, const std::string& step);
 
     std::string dir_;
     aalam_log_fn log_;
