@@ -8,7 +8,7 @@ android {
 
     defaultConfig {
         applicationId "com.aalamstudio.compiler"
-        minSdk 24
+        minSdk 26
         targetSdk 34
         versionCode 1
         versionName "1.0"
@@ -22,6 +22,9 @@ android {
         jniLibs {
             useLegacyPackaging = true
         }
+        resources {
+            pickFirsts += ['META-INF/**']
+        }
     }
     externalNativeBuild {
         cmake {
@@ -33,4 +36,5 @@ android {
 
 dependencies {
     implementation 'org.eclipse.jdt:ecj:3.12.3'
+    implementation 'com.android.tools:r8:8.2.34'
 }
