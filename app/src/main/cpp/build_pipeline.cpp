@@ -43,10 +43,11 @@ void BuildPipeline::say(const std::string& msg) {
 
 int BuildPipeline::run(const std::string& target) {
     if (!prepare(target)) return 1;
-    if (!compileResources()) return 2;
-    if (!compileJava()) return 3;
-    say("Steps 4-7 not implemented yet - next.");
-    return 4;
+    if (!runStep("[2/7] Processing resources (aapt2)", "aapt2")) return 2;
+    if (!runStep("[3/7] Compiling Java (ECJ)", "ecj")) return 3;
+    if (!runStep("[4/7] Optimizing to DEX (D8)", "d8")) return 4;
+    say("Steps 5-7 not implemented yet - next.");
+    return 5;
 }
 
 bool BuildPipeline::prepare(const std::string& target) {
@@ -79,32 +80,18 @@ bool BuildPipeline::prepare(const std::string& target) {
     return true;
 }
 
-bool BuildPipeline::compileResources() {
-    say("[2/7] Processing resources (aapt2)...");
+// Runs one step that is implemented in the Java layer.
+bool BuildPipeline::runStep(const std::string& label, const std::string& step) {
+    say(label + "...");
     if (!step_) {
         say("ERROR: no Java step runner available");
         return false;
     }
-    int rc = step_("aapt2", dir_.c_str(), user_);
+    int rc = step_(step.c_str(), dir_.c_str(), user_);
     if (rc != 0) {
-        say("[2/7] Processing resources... FAILED");
+        say(label + "... FAILED");
         return false;
     }
-    say("[2/7] Processing resources... OK");
-    return true;
-}
-
-bool BuildPipeline::compileJava() {
-    say("[3/7] Compiling Java (ECJ)...");
-    if (!step_) {
-        say("ERROR: no Java step runner available");
-        return false;
-    }
-    int rc = step_("ecj", dir_.c_str(), user_);
-    if (rc != 0) {
-        say("[3/7] Compiling Java... FAILED");
-        return false;
-    }
-    say("[3/7] Compiling Java... OK");
+    say(label + "... OK");
     return true;
 }
