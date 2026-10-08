@@ -46,8 +46,11 @@ int BuildPipeline::run(const std::string& target) {
     if (!runStep("[2/7] Processing resources (aapt2)", "aapt2")) return 2;
     if (!runStep("[3/7] Compiling Java (ECJ)", "ecj")) return 3;
     if (!runStep("[4/7] Optimizing to DEX (D8)", "d8")) return 4;
-    say("Steps 5-7 not implemented yet - next.");
-    return 5;
+    if (!runStep("[5/7] Packaging APK", "pack")) return 5;
+    if (!runStep("[6/7] Signing APK", "sign")) return 6;
+    if (!runStep("[7/7] Finishing", "finish")) return 7;
+    say("BUILD COMPLETE. Tap SAVE APK to export.");
+    return 0;
 }
 
 bool BuildPipeline::prepare(const std::string& target) {
