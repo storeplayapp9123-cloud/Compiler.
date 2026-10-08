@@ -20,6 +20,9 @@ public class NativeBridge {
         if ("aapt2".equals(step)) return AaptRunner.run(appContext, dir);
         if ("ecj".equals(step)) return EcjRunner.compile(appContext, dir);
         if ("d8".equals(step)) return DexRunner.run(appContext, dir);
+        if ("pack".equals(step)) return PackRunner.run(dir);
+        if ("sign".equals(step)) return SignRunner.run(dir);
+        if ("finish".equals(step)) return FinishRunner.run(appContext, dir);
         return "ERROR: unknown step " + step;
     }
 }
