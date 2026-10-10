@@ -1,6 +1,8 @@
 #include "build_pipeline.h"
 
 #include <sys/stat.h>
+#include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <sstream>
 
@@ -29,6 +31,12 @@ std::string jsonString(const std::string& json, const std::string& key) {
     size_t e = json.find('"', p + 1);
     if (e == std::string::npos) return "";
     return json.substr(p + 1, e - p - 1);
+}
+
+std::string lower(std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    return s;
 }
 
 }  // namespace
@@ -68,7 +76,7 @@ bool BuildPipeline::prepare(const std::string& target) {
         say("ERROR: manifest.json has no \"name\"");
         return false;
     }
-    if (json.find("\"" + target + "\"") == std::string::npos) {
+    if (lower(json).find("\"" + lower(target) + "\"") == std::string::npos) {
         say("ERROR: platform '" + target + "' not listed in manifest");
         return false;
     }
