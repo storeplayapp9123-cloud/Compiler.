@@ -1,5 +1,6 @@
 plugins {
     id 'com.android.application'
+    id 'com.google.gms.google-services'
 }
 
 android {
@@ -13,6 +14,20 @@ android {
         versionCode 1
         versionName "1.0"
         ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }
+    }
+    signingConfigs {
+        aalam {
+            storeFile file('aalam-debug.jks')
+            storeType 'pkcs12'
+            storePassword 'aalam123'
+            keyAlias 'aalamdebug'
+            keyPassword 'aalam123'
+        }
+    }
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.aalam
+        }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -38,4 +53,8 @@ dependencies {
     implementation 'org.eclipse.jdt:ecj:3.12.3'
     implementation 'com.android.tools:r8:8.2.33'
     implementation 'com.android.tools.build:apksig:8.2.2'
+
+    implementation platform('com.google.firebase:firebase-bom:33.1.2')
+    implementation 'com.google.firebase:firebase-auth'
+    implementation 'com.google.android.gms:play-services-auth:21.2.0'
 }
