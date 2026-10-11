@@ -1,6 +1,7 @@
 package com.aalamstudio.compiler;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -17,13 +18,18 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
+import org.json.JSONObject;
+
 import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -34,6 +40,10 @@ public class MainActivity extends Activity {
 
     private TextView logView;
     private Button saveBtn;
+    private Button cloudBtn;
+
+    private byte[] lastAsc;
+    private String lastAscName = "project";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -84,6 +94,25 @@ public class MainActivity extends Activity {
         });
         root.addView(open);
 
+        Button mine = new Button(this);
+        mine.setText("My cloud projects");
+        mine.setTextColor(GOLD);
+        mine.setBackgroundColor(Color.parseColor("#222222"));
+        mine.setOnClickListener(v -> showCloudProjects());
+        root.addView(mine);
+
+        cloudBtn = new Button(this);
+        cloudBtn.setText("Save this project to cloud");
+        cloudBtn.setTextColor(Color.BLACK);
+        cloudBtn.setBackgroundColor(Color.LTGRAY);
+        cloudBtn.setVisibility(View.GONE);
+        cloudBtn.setOnClickListener(v -> {
+            if (lastAsc == null) return;
+            append("Uploading to cloud...");
+            CloudSync.upload(lastAscName, lastAsc, logResult());
+        });
+        root.addView(cloudBtn);
+
         saveBtn = new Button(this);
         saveBtn.setText("Save APK");
         saveBtn.setTextColor(Color.BLACK);
@@ -117,25 +146,42 @@ public class MainActivity extends Activity {
 
         if (requestCode == PICK_ASC) {
             final Uri uri = data.getData();
-            new Thread(() -> runBuild(uri)).start();
+            new Thread(() -> openAsc(uri)).start();
         } else if (requestCode == SAVE_APK) {
             final Uri dest = data.getData();
             new Thread(() -> saveApk(dest)).start();
         }
     }
 
-    private void runBuild(Uri uri) {
+    // ---------- build ----------
+
+    private void openAsc(Uri uri) {
+        try (InputStream in = getContentResolver().openInputStream(uri)) {
+            runBuild(readAll(in));
+        } catch (Exception e) {
+            append("ERROR: " + e);
+        }
+    }
+
+    private void runBuild(byte[] asc) {
         try {
+            lastAsc = asc;
             FinishRunner.lastApk = null;
-            runOnUiThread(() -> saveBtn.setVisibility(View.GONE));
+            runOnUiThread(() -> {
+                saveBtn.setVisibility(View.GONE);
+                cloudBtn.setVisibility(View.GONE);
+            });
 
             File work = new File(getFilesDir(), "work");
             deleteRecursive(work);
             work.mkdirs();
 
             append("Extracting .asc ...");
-            int count = unzip(getContentResolver().openInputStream(uri), work);
+            int count = unzip(new ByteArrayInputStream(asc), work);
             append("Extracted " + count + " files");
+
+            lastAscName = readProjectName(work);
+            runOnUiThread(() -> cloudBtn.setVisibility(View.VISIBLE));
 
             String out = NativeBridge.build(work.getAbsolutePath(), "android");
             append(out);
@@ -146,6 +192,15 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             append("ERROR: " + e);
         }
+    }
+
+    private String readProjectName(File work) {
+        try (InputStream in = new FileInputStream(new File(work, "manifest.json"))) {
+            String n = new JSONObject(new String(readAll(in), "UTF-8")).optString("name", "");
+            if (!n.trim().isEmpty()) return n.trim();
+        } catch (Exception ignored) {
+        }
+        return "project";
     }
 
     private void saveApk(Uri dest) {
@@ -160,6 +215,67 @@ public class MainActivity extends Activity {
         }
     }
 
+    // ---------- cloud ----------
+
+    private CloudSync.Result<String> logResult() {
+        return new CloudSync.Result<String>() {
+            @Override public void ok(String v) { append(v); }
+            @Override public void fail(String m) { append("Cloud ERROR: " + m); }
+        };
+    }
+
+    private void showCloudProjects() {
+        append("Loading cloud projects...");
+        CloudSync.list(new CloudSync.Result<List<CloudSync.Item>>() {
+            @Override
+            public void ok(final List<CloudSync.Item> items) {
+                if (items.isEmpty()) {
+                    append("Cloud me abhi koi project nahi hai");
+                    return;
+                }
+                String[] names = new String[items.size()];
+                for (int i = 0; i < names.length; i++) {
+                    names[i] = items.get(i).name + "  (" + (items.get(i).size / 1024) + " KB)";
+                }
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("My cloud projects")
+                        .setItems(names, (d, i) -> projectActions(items.get(i)))
+                        .show();
+            }
+
+            @Override
+            public void fail(String m) {
+                append("Cloud ERROR: " + m);
+            }
+        });
+    }
+
+    private void projectActions(final CloudSync.Item it) {
+        new AlertDialog.Builder(this)
+                .setTitle(it.name)
+                .setItems(new String[]{"Build", "Delete"}, (d, which) -> {
+                    if (which == 0) {
+                        append("Downloading " + it.name + " ...");
+                        CloudSync.download(it.id, new CloudSync.Result<byte[]>() {
+                            @Override
+                            public void ok(final byte[] bytes) {
+                                new Thread(() -> runBuild(bytes)).start();
+                            }
+
+                            @Override
+                            public void fail(String m) {
+                                append("Cloud ERROR: " + m);
+                            }
+                        });
+                    } else {
+                        CloudSync.delete(it.id, logResult());
+                    }
+                })
+                .show();
+    }
+
+    // ---------- misc ----------
+
     private void signOut() {
         FirebaseAuth.getInstance().signOut();
         GoogleSignIn.getClient(this,
@@ -169,6 +285,14 @@ public class MainActivity extends Activity {
                     startActivity(new Intent(this, LoginActivity.class));
                     finish();
                 });
+    }
+
+    private static byte[] readAll(InputStream in) throws IOException {
+        ByteArrayOutputStream bo = new ByteArrayOutputStream();
+        byte[] buf = new byte[65536];
+        int r;
+        while ((r = in.read(buf)) > 0) bo.write(buf, 0, r);
+        return bo.toByteArray();
     }
 
     private int unzip(InputStream in, File dest) throws IOException {
