@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "708437098034",
+    "project_id": "aalam-compiler-49ec1",
+    "storage_bucket": "aalam-compiler-49ec1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:708437098034:android:4b27922adccd15b900862b",
+        "android_client_info": {
+          "package_name": "com.aalamstudio.compiler"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "708437098034-34rm23h6pgq0047ftagdglbbcn0cf4cl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aalamstudio.compiler",
+            "certificate_hash": "c8fdc6d98ac8e1bd1d76f66a29912112479c8393"
+          }
+        },
+        {
+          "client_id": "708437098034-jskgauc0aepmr52itjn3dh59leou0loh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBpUMrKtdO9IcNwxMPh4Z8Oi2ce_ZHuoKA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "708437098034-jskgauc0aepmr52itjn3dh59leou0loh.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
