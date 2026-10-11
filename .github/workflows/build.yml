@@ -18,6 +18,11 @@ jobs:
           cp "$ANDROID_HOME/platforms/android-34/android.jar" app/src/main/assets/android.jar
       - name: Check native libs
         run: ls -l app/src/main/jniLibs/arm64-v8a | head -n 70
+      - name: Check keystore and Firebase config
+        run: |
+          test -f app/aalam-debug.jks || { echo "ERROR: app/aalam-debug.jks missing"; exit 1; }
+          test -f app/google-services.json || { echo "ERROR: app/google-services.json missing"; exit 1; }
+          ls -l app/aalam-debug.jks app/google-services.json
       - run: gradle assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
