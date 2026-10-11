@@ -12,6 +12,11 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -26,12 +31,21 @@ public class MainActivity extends Activity {
     private static final int PICK_ASC = 1;
     private static final int SAVE_APK = 2;
     private static final int GOLD = Color.parseColor("#D4AF37");
+
     private TextView logView;
     private Button saveBtn;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) {
+            startActivity(new Intent(this, LoginActivity.class));
+            finish();
+            return;
+        }
+
         NativeBridge.init(this);
 
         LinearLayout root = new LinearLayout(this);
@@ -50,6 +64,13 @@ public class MainActivity extends Activity {
         sub.setText("Code to Compile");
         sub.setTextColor(Color.LTGRAY);
         root.addView(sub);
+
+        TextView who = new TextView(this);
+        who.setText((user.getEmail() == null ? "" : user.getEmail()) + "   |   Sign out");
+        who.setTextColor(Color.GRAY);
+        who.setPadding(0, 8, 0, 8);
+        who.setOnClickListener(v -> signOut());
+        root.addView(who);
 
         Button open = new Button(this);
         open.setText("Open .asc file");
@@ -137,6 +158,17 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             append("Save ERROR: " + e);
         }
+    }
+
+    private void signOut() {
+        FirebaseAuth.getInstance().signOut();
+        GoogleSignIn.getClient(this,
+                new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build())
+                .signOut()
+                .addOnCompleteListener(t -> {
+                    startActivity(new Intent(this, LoginActivity.class));
+                    finish();
+                });
     }
 
     private int unzip(InputStream in, File dest) throws IOException {
