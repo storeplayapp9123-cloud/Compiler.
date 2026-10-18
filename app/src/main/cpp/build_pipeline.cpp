@@ -3,6 +3,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <cstdio>
 #include <algorithm>
 #include <cctype>
 #include <fstream>
@@ -66,6 +67,17 @@ bool findManifestDir(const std::string& base, int depth, std::string& out) {
     return found;
 }
 
+// <manifest> me package= nahi hai to inject karo
+void ensurePackage(const std::string& manifestPath, const std::string& pkg) {
+    std::string xml = readFile(manifestPath);
+    if (xml.empty() || xml.find("package=") != std::string::npos) return;
+    size_t p = xml.find("<manifest");
+    if (p == std::string::npos) return;
+    xml.insert(p + 9, " package=\"" + pkg + "\"");
+    std::ofstream f(manifestPath, std::ios::trunc);
+    f << xml;
+}
+
 }  // namespace
 
 BuildPipeline::BuildPipeline(const std::string& projectDir, aalam_log_fn log,
@@ -109,7 +121,7 @@ bool BuildPipeline::prepare(const std::string& target) {
     }
 
     // App project ka AndroidManifest.xml dhundo
-    // (Studio: Android/app/src/main/, purana flat: root)
+    // (Studio: src/Android/app/src/main/, purana flat: root)
     std::string appRoot;
     if (!findManifestDir(dir_, 6, appRoot)) {
         say("ERROR: AndroidManifest.xml missing in .asc");
@@ -117,9 +129,18 @@ bool BuildPipeline::prepare(const std::string& target) {
         return false;
     }
 
-    // Studio structure ko flat layout pe link karo (Java steps root se padhte hain)
     if (appRoot != dir_) {
+        // Studio structure: src/ ke andar poora project hai. Use _project me
+        // hata do, taaki root pe purana flat layout ban sake.
+        std::string srcDir = dir_ + "/src";
+        std::string moved = dir_ + "/_project";
+        if (appRoot.compare(0, srcDir.size() + 1, srcDir + "/") == 0 && !exists(moved)) {
+            if (rename(srcDir.c_str(), moved.c_str()) == 0) {
+                appRoot = moved + appRoot.substr(srcDir.size());
+            }
+        }
         say("App root: " + appRoot);
+
         if (!exists(dir_ + "/AndroidManifest.xml"))
             symlink((appRoot + "/AndroidManifest.xml").c_str(),
                     (dir_ + "/AndroidManifest.xml").c_str());
@@ -128,6 +149,11 @@ bool BuildPipeline::prepare(const std::string& target) {
         if (!exists(dir_ + "/src") && exists(appRoot + "/java"))
             symlink((appRoot + "/java").c_str(), (dir_ + "/src").c_str());
     }
+
+    // Safety net: package= na ho to manifest.json se (ya default) daal do
+    std::string pkg = jsonString(json, "package");
+    if (pkg.empty()) pkg = "com.aalamstudio.app";
+    ensurePackage(dir_ + "/AndroidManifest.xml", pkg);
 
     if (!exists(dir_ + "/src")) {
         say("ERROR: no src/ or java/ folder in .asc");
