@@ -1,6 +1,8 @@
 #include "build_pipeline.h"
 
+#include <dirent.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <algorithm>
 #include <cctype>
 #include <fstream>
@@ -37,6 +39,31 @@ std::string lower(std::string s) {
     std::transform(s.begin(), s.end(), s.begin(),
                    [](unsigned char c) { return std::tolower(c); });
     return s;
+}
+
+// base ke andar (max depth tak) wo folder dhundho jisme AndroidManifest.xml ho
+bool findManifestDir(const std::string& base, int depth, std::string& out) {
+    if (exists(base + "/AndroidManifest.xml")) {
+        out = base;
+        return true;
+    }
+    if (depth == 0) return false;
+    DIR* d = opendir(base.c_str());
+    if (!d) return false;
+    bool found = false;
+    while (dirent* e = readdir(d)) {
+        std::string n = e->d_name;
+        if (n == "." || n == "..") continue;
+        std::string sub = base + "/" + n;
+        struct stat st;
+        if (stat(sub.c_str(), &st) == 0 && S_ISDIR(st.st_mode) &&
+            findManifestDir(sub, depth - 1, out)) {
+            found = true;
+            break;
+        }
+    }
+    closedir(d);
+    return found;
 }
 
 }  // namespace
@@ -80,8 +107,30 @@ bool BuildPipeline::prepare(const std::string& target) {
         say("ERROR: platform '" + target + "' not listed in manifest");
         return false;
     }
+
+    // App project ka AndroidManifest.xml dhundo
+    // (Studio: Android/app/src/main/, purana flat: root)
+    std::string appRoot;
+    if (!findManifestDir(dir_, 6, appRoot)) {
+        say("ERROR: AndroidManifest.xml missing in .asc");
+        say("Searched in: " + dir_);
+        return false;
+    }
+
+    // Studio structure ko flat layout pe link karo (Java steps root se padhte hain)
+    if (appRoot != dir_) {
+        say("App root: " + appRoot);
+        if (!exists(dir_ + "/AndroidManifest.xml"))
+            symlink((appRoot + "/AndroidManifest.xml").c_str(),
+                    (dir_ + "/AndroidManifest.xml").c_str());
+        if (!exists(dir_ + "/res") && exists(appRoot + "/res"))
+            symlink((appRoot + "/res").c_str(), (dir_ + "/res").c_str());
+        if (!exists(dir_ + "/src") && exists(appRoot + "/java"))
+            symlink((appRoot + "/java").c_str(), (dir_ + "/src").c_str());
+    }
+
     if (!exists(dir_ + "/src")) {
-        say("ERROR: src/ folder missing in .asc");
+        say("ERROR: no src/ or java/ folder in .asc");
         return false;
     }
 
