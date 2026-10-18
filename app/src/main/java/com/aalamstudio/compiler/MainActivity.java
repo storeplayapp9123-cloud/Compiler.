@@ -37,6 +37,7 @@ public class MainActivity extends Activity {
     private static final int PICK_ASC = 1;
     private static final int SAVE_APK = 2;
     private static final int GOLD = Color.parseColor("#D4AF37");
+    private static final String PENDING_NAME = "incoming.asc";
 
     private TextView logView;
     private Button saveBtn;
@@ -51,6 +52,8 @@ public class MainActivity extends Activity {
 
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user == null) {
+            // Studio se .asc aayi ho to login se pehle cache me rakh lo
+            stashIncoming();
             startActivity(new Intent(this, LoginActivity.class));
             finish();
             return;
@@ -137,6 +140,12 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
         setContentView(root);
+
+        // Studio se aayi .asc (ya login ke baad cache me rakhi .asc) build karo.
+        // Rotate hone par dobara build na chale.
+        if (savedInstanceState == null) {
+            handleIncoming();
+        }
     }
 
     @Override
@@ -151,6 +160,55 @@ public class MainActivity extends Activity {
             final Uri dest = data.getData();
             new Thread(() -> saveApk(dest)).start();
         }
+    }
+
+    // ---------- incoming .asc (from Aalam Studio) ----------
+
+    /** Login baaki ho to aayi hui .asc ko cache me copy kar lo. */
+    private void stashIncoming() {
+        Intent intent = getIntent();
+        if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction())
+                || intent.getData() == null) return;
+        try (InputStream is = getContentResolver().openInputStream(intent.getData());
+             OutputStream os = new FileOutputStream(new File(getCacheDir(), PENDING_NAME))) {
+            if (is == null) return;
+            byte[] buf = new byte[65536];
+            int r;
+            while ((r = is.read(buf)) > 0) os.write(buf, 0, r);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void handleIncoming() {
+        Intent intent = getIntent();
+        final Uri uri = (intent != null && Intent.ACTION_VIEW.equals(intent.getAction()))
+                ? intent.getData() : null;
+
+        if (uri != null) {
+            append("Received .asc from Aalam Studio");
+            new Thread(() -> openAsc(uri)).start();
+            return;
+        }
+
+        final File pending = new File(getCacheDir(), PENDING_NAME);
+        if (!pending.exists()) return;
+
+        boolean fresh = System.currentTimeMillis() - pending.lastModified() < 10 * 60 * 1000L;
+        if (!fresh) {
+            pending.delete();
+            return;
+        }
+
+        append("Received .asc from Aalam Studio");
+        new Thread(() -> {
+            try (InputStream is = new FileInputStream(pending)) {
+                byte[] bytes = readAll(is);
+                pending.delete();
+                runBuild(bytes);
+            } catch (Exception e) {
+                append("ERROR: " + e);
+            }
+        }).start();
     }
 
     // ---------- build ----------
