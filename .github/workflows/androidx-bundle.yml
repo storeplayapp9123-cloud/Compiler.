@@ -1,13 +1,11 @@
 name: AndroidX bundle
 
-on:
-  workflow_dispatch:
+on: workflow_dispatch
 
 permissions:
   contents: write
 
 env:
-  # Compiler module ka assets folder. Agar tumhara module "app" nahi hai to yahan badlo.
   ASSETS_DIR: app/src/main/assets/androidx
 
 jobs:
