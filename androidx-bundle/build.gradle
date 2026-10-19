@@ -1,1 +1,59 @@
-implementation 'androidx.appcompat:appcompat:1.6.1'
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.attributes.Attribute
+
+plugins {
+    id 'com.android.library' version '8.2.2'
+}
+
+android {
+    namespace 'com.aalamstudio.bundle'
+    compileSdk 34
+    defaultConfig {
+        minSdk 21
+    }
+}
+
+dependencies {
+    // Jo libraries chahiye yahan likho (baad me aur add kar sakte ho)
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+}
+
+// Saari AARs aur jars (transitive dependencies ke saath) ek folder me nikalta hai
+tasks.register('collectLibs') {
+    doLast {
+        def out = new File(buildDir, 'androidx-libs')
+        out.deleteDir()
+        out.mkdirs()
+
+        def cfg = configurations.getByName('releaseRuntimeClasspath')
+        def aarIds = [] as Set
+
+        def aarArtifacts = cfg.incoming.artifactView {
+            attributes { attribute(Attribute.of('artifactType', String), 'aar') }
+            lenient(true)
+        }.artifacts.artifacts
+
+        aarArtifacts.each { a ->
+            def id = a.id.componentIdentifier
+            if (id instanceof ModuleComponentIdentifier) {
+                aarIds << id.displayName
+                new File(out, "${id.group}_${id.module}-${id.version}.aar").bytes = a.file.bytes
+            }
+        }
+
+        def jarArtifacts = cfg.incoming.artifactView {
+            attributes { attribute(Attribute.of('artifactType', String), 'jar') }
+            lenient(true)
+        }.artifacts.artifacts
+
+        jarArtifacts.each { a ->
+            def id = a.id.componentIdentifier
+            if (id instanceof ModuleComponentIdentifier && !aarIds.contains(id.displayName)) {
+                new File(out, "${id.group}_${id.module}-${id.version}.jar").bytes = a.file.bytes
+            }
+        }
+
+        println "Collected ${out.list().length} files into ${out}"
+        out.list().sort().each { println "  " + it }
+    }
+}
