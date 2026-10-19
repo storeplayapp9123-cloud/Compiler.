@@ -41,6 +41,8 @@ public class EcjRunner {
             args.add("-bootclasspath"); args.add(androidJar.getAbsolutePath());
 
             StringBuilder cp = new StringBuilder();
+
+            // project ke apne libs/*.jar
             File[] jars = new File(projectDir, "libs").listFiles();
             if (jars != null) {
                 for (File j : jars) {
@@ -50,6 +52,14 @@ public class EcjRunner {
                     }
                 }
             }
+
+            // AndroidX libraries (assets/androidx se)
+            List<File> androidx = AndroidxLibs.classpathJars(ctx);
+            for (File j : androidx) {
+                if (cp.length() > 0) cp.append(File.pathSeparator);
+                cp.append(j.getAbsolutePath());
+            }
+
             if (cp.length() > 0) { args.add("-classpath"); args.add(cp.toString()); }
 
             args.add("-d"); args.add(out.getAbsolutePath());
@@ -76,7 +86,8 @@ public class EcjRunner {
             if (fail[0] != null) return "ERROR: ECJ crashed: " + fail[0];
             if (!ok[0]) return "ERROR: Java compile failed\n" + errW + outW;
 
-            return "OK: " + countClasses(out) + " class files in build/classes";
+            return "OK: " + countClasses(out) + " class files in build/classes"
+                    + " (androidx jars: " + androidx.size() + ")";
         } catch (Throwable e) {
             return "ERROR: " + e;
         }
