@@ -13,6 +13,7 @@ import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -20,6 +21,8 @@ import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class AaptRunner {
 
@@ -64,6 +67,7 @@ public class AaptRunner {
             String v = exec(Arrays.asList(aapt2.getAbsolutePath(), "version"), build, libPath);
             if (v != null) return "ERROR: aapt2 will not start\n" + v;
 
+            // ---- app ki apni resources ----
             boolean hasRes = hasSubDirs(res);
             if (hasRes) {
                 String err = exec(Arrays.asList(aapt2.getAbsolutePath(), "compile",
@@ -72,6 +76,36 @@ public class AaptRunner {
                 if (err != null) return "ERROR: aapt2 compile failed\n" + err;
             }
 
+            // ---- AndroidX libraries ki resources (pehli baar compile, phir cache) ----
+            List<String> libZips = new ArrayList<>();
+            List<String> extraPkgs = new ArrayList<>();
+            String appPkg = manifestPackage(manifest);
+
+            for (AndroidxLibs.Lib lib : AndroidxLibs.prepare(ctx)) {
+                if (lib.resDir == null || !hasSubDirs(lib.resDir)) continue;
+
+                File zip = new File(lib.dir, "compiled.zip");
+                if (!zip.exists() || zip.length() == 0) {
+                    File tmp = new File(lib.dir, "compiled.tmp.zip");
+                    tmp.delete();
+                    String libErr = exec(Arrays.asList(aapt2.getAbsolutePath(), "compile",
+                            "--dir", lib.resDir.getAbsolutePath(),
+                            "-o", tmp.getAbsolutePath()), build, libPath);
+                    if (libErr != null) {
+                        return "ERROR: aapt2 compile failed for " + lib.name + "\n" + libErr;
+                    }
+                    if (!tmp.renameTo(zip)) {
+                        return "ERROR: could not save compiled resources of " + lib.name;
+                    }
+                }
+                libZips.add(zip.getAbsolutePath());
+
+                if (!lib.pkg.isEmpty() && !lib.pkg.equals(appPkg) && !extraPkgs.contains(lib.pkg)) {
+                    extraPkgs.add(lib.pkg);
+                }
+            }
+
+            // ---- link ----
             List<String> link = new ArrayList<>(Arrays.asList(
                     aapt2.getAbsolutePath(), "link",
                     "-o", baseApk.getAbsolutePath(),
@@ -81,19 +115,47 @@ public class AaptRunner {
                     "--min-sdk-version", "24",
                     "--target-sdk-version", "34",
                     "--auto-add-overlay"));
+            if (!extraPkgs.isEmpty()) {
+                link.add("--extra-packages");
+                link.add(join(extraPkgs, ":"));
+            }
             if (assets.isDirectory()) {
                 link.add("-A");
                 link.add(assets.getAbsolutePath());
             }
+            // pehle libraries (kam priority), sabse last me app (zyada priority)
+            link.addAll(libZips);
             if (hasRes) link.add(resZip.getAbsolutePath());
 
-            String err = exec(link, build, libPath);
-            if (err != null) return "ERROR: aapt2 link failed\n" + err;
+            String linkErr = exec(link, build, libPath);
+            if (linkErr != null) return "ERROR: aapt2 link failed\n" + linkErr;
 
-            return "OK: base.apk created (" + baseApk.length() + " bytes)";
+            return "OK: base.apk created (" + baseApk.length() + " bytes, "
+                    + libZips.size() + " androidx res libs)";
         } catch (Throwable e) {
             return "ERROR: " + e;
         }
+    }
+
+    /** <manifest package="..."> ka package, ya "". */
+    private static String manifestPackage(File manifest) {
+        try {
+            String x = new String(Files.readAllBytes(manifest.toPath()), "UTF-8");
+            Matcher m = Pattern.compile("<manifest[^>]*?\\bpackage\\s*=\\s*\"([^\"]+)\"",
+                    Pattern.DOTALL).matcher(x);
+            if (m.find()) return m.group(1);
+        } catch (Exception ignored) {
+        }
+        return "";
+    }
+
+    private static String join(List<String> parts, String sep) {
+        StringBuilder sb = new StringBuilder();
+        for (String p : parts) {
+            if (sb.length() > 0) sb.append(sep);
+            sb.append(p);
+        }
+        return sb.toString();
     }
 
     /** Makes symlinks for versioned lib names. Returns list of libs not found anywhere. */
