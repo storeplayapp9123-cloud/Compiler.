@@ -32,10 +32,16 @@ public class AndroidxLibs {
     }
 
     private static final String ASSET_DIR = "androidx";
+
+    /** true ho to AndroidX libraries build me nahi judti (games ke liye). */
+    public static volatile boolean disabled = false;
+
     private static List<Lib> cache;
     private static String cacheStamp;
 
     public static synchronized List<Lib> prepare(Context ctx) throws IOException {
+        if (disabled) return Collections.emptyList();
+
         String[] names = ctx.getAssets().list(ASSET_DIR);
         if (names == null || names.length == 0) return Collections.emptyList();
         Arrays.sort(names);
