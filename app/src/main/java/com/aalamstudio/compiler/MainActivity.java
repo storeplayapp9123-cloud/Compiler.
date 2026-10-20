@@ -48,8 +48,9 @@ public class MainActivity extends Activity {
     private Button startBtn;
 
     private byte[] lastAsc;
-    private boolean verified = false;
-    private boolean building = false;
+    private volatile boolean verified = false;
+    private volatile boolean building = false;
+    private volatile GamePrep.Info gameInfo;   // null = normal app, nahi to game
     private File readyApk;
 
     @Override
@@ -216,6 +217,7 @@ public class MainActivity extends Activity {
     private void verifyAsc(byte[] asc) {
         lastAsc = asc;
         verified = false;
+        gameInfo = null;
         runOnUiThread(() -> {
             setStartEnabled(false);
             apkCard.setVisibility(View.GONE);
@@ -245,19 +247,31 @@ public class MainActivity extends Activity {
                 verifyFail("Package name galat hai: \"" + pkg + "\"");
                 return;
             }
-            if (findFile(work, "AndroidManifest.xml", 6) == null) {
-                verifyFail("AndroidManifest.xml nahi mila (Android app project chahiye)");
-                return;
-            }
-            if (!hasSource(work, 8)) {
-                verifyFail("Java/Kotlin source file nahi mili");
-                return;
+
+            final boolean game = GamePrep.isGame(j);
+            if (game) {
+                try {
+                    gameInfo = GamePrep.inspect(work, j);
+                } catch (GamePrep.Fail f) {
+                    verifyFail(f.getMessage());
+                    return;
+                }
+            } else {
+                if (findFile(work, "AndroidManifest.xml", 6) == null) {
+                    verifyFail("AndroidManifest.xml nahi mila (Android app project chahiye)");
+                    return;
+                }
+                if (!hasSource(work, 8)) {
+                    verifyFail("Java/Kotlin source file nahi mili");
+                    return;
+                }
             }
 
             verified = true;
+            final String kind = game ? "Game" : "App";
             runOnUiThread(() -> {
                 verifyView.setTextColor(Color.parseColor("#7CFC7C"));
-                verifyView.setText("✓ Verified: " + name + "  (" + pkg + ")");
+                verifyView.setText("✓ Verified (" + kind + "): " + name + "  (" + pkg + ")");
                 setStartEnabled(true);
             });
         } catch (Exception e) {
@@ -290,6 +304,14 @@ public class MainActivity extends Activity {
                 File work = freshWork();
                 unzip(new ByteArrayInputStream(lastAsc), work);
 
+                GamePrep.Info game = gameInfo;
+                AndroidxLibs.disabled = (game != null);
+                if (game != null) {
+                    append("Game project: manifest aur engine taiyar kar raha hoon...");
+                    GamePrep.prepare(this, work, game);
+                }
+
+                NativeBridge.progress = msg -> append(msg);
                 FinishRunner.lastApk = null;
                 append("Compiling...");
                 String out = NativeBridge.build(work.getAbsolutePath(), "android");
@@ -301,6 +323,7 @@ public class MainActivity extends Activity {
             } catch (Exception e) {
                 append("ERROR: " + e);
             } finally {
+                NativeBridge.progress = null;
                 building = false;
                 runOnUiThread(() -> {
                     startBtn.setText("START");
