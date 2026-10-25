@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-/** assets/androidx/*.aar|*.jar ko ek baar filesDir/androidx-ready me khol deta hai. */
+/** AndroidX .aar/.jar files (Aalam SDK app ya Compiler ke assets se) ek baar khol ke rakhta hai. */
 public class AndroidxLibs {
 
     public static class Lib {
@@ -42,11 +42,15 @@ public class AndroidxLibs {
     public static synchronized List<Lib> prepare(Context ctx) throws IOException {
         if (disabled) return Collections.emptyList();
 
-        String[] names = ctx.getAssets().list(ASSET_DIR);
+        // Pehle Aalam SDK app, nahi to Compiler ke apne assets
+        List<String> sdkNames = SdkClient.listDir(ctx, "androidx");
+        boolean useSdk = !sdkNames.isEmpty();
+        String[] names = useSdk ? sdkNames.toArray(new String[0]) : ctx.getAssets().list(ASSET_DIR);
         if (names == null || names.length == 0) return Collections.emptyList();
         Arrays.sort(names);
 
-        String stamp = lastUpdate(ctx) + ":" + names.length;
+        String source = useSdk ? "sdk" + SdkClient.stamp(ctx) : "assets";
+        String stamp = lastUpdate(ctx) + ":" + source + ":" + names.length;
         File root = new File(ctx.getFilesDir(), "androidx-ready");
         File stampFile = new File(root, ".stamp");
 
@@ -56,7 +60,7 @@ public class AndroidxLibs {
         if (!fresh) {
             deleteRecursive(root);
             root.mkdirs();
-            for (String n : names) extractAsset(ctx, n, root);
+            for (String n : names) extractAsset(ctx, n, root, useSdk);
             writeText(stampFile, stamp);
         }
         cache = scan(root);
@@ -73,7 +77,8 @@ public class AndroidxLibs {
 
     // ---------- extract ----------
 
-    private static void extractAsset(Context ctx, String asset, File root) throws IOException {
+    private static void extractAsset(Context ctx, String asset, File root, boolean useSdk)
+            throws IOException {
         int dot = asset.lastIndexOf('.');
         if (dot <= 0) return;
         String base = asset.substring(0, dot);
@@ -81,7 +86,9 @@ public class AndroidxLibs {
 
         File dir = new File(root, base);
         dir.mkdirs();
-        try (InputStream in = ctx.getAssets().open(ASSET_DIR + "/" + asset)) {
+        try (InputStream in = useSdk
+                ? SdkClient.open(ctx, "androidx/" + asset, null)
+                : ctx.getAssets().open(ASSET_DIR + "/" + asset)) {
             if (lower.endsWith(".jar")) {
                 copy(in, new File(dir, "classes.jar"));
             } else if (lower.endsWith(".aar")) {
