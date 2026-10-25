@@ -5,11 +5,15 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <queries>
+        <package android:name="com.aalamstudio.sdk" />
+    </queries>
+
     <application
-        android:label="Aalam Compiler"
-        android:largeHeap="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="Aalam Compiler"
+        android:largeHeap="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
         <activity
