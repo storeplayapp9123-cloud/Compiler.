@@ -24,13 +24,21 @@ public class SdkClient {
     private static List<String> indexCache;
     private static String indexStamp = "";
 
-    /** SDK app install hai to uska lastUpdateTime, nahi to "". */
+        /** SDK app install hai to uska lastUpdateTime + download version, nahi to "". */
     public static String stamp(Context ctx) {
+        String base;
         try {
-            return String.valueOf(ctx.getPackageManager().getPackageInfo(SDK_PACKAGE, 0).lastUpdateTime);
+            base = String.valueOf(ctx.getPackageManager().getPackageInfo(SDK_PACKAGE, 0).lastUpdateTime);
         } catch (Exception e) {
             return "";
         }
+        String ver = "";
+        try (Cursor c = ctx.getContentResolver().query(
+                Uri.parse("content://" + AUTHORITY + "/version"), null, null, null, null)) {
+            if (c != null && c.moveToFirst()) ver = c.getString(0);
+        } catch (Exception ignored) {
+        }
+        return base + ":" + ver;
     }
 
     /** SDK ki saari files ke path (jaise androidx/foo.aar). SDK na ho to khali. */
